@@ -108,7 +108,7 @@ function Reporter (opts) {
   // prepare base xml
   this.xml = [
     {
-      name: 'resource',
+      name: 'testsuites',
       attrs: {
         name:'DalekJSTest'
       },
