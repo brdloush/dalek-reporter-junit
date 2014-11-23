@@ -100,7 +100,6 @@ function Reporter (opts) {
   this.variationCount = -1;
   this.data = {};
   this.data.tests = [];
-  this.lastAssertion = {};
   this.browser = null;
 
   var defaultReportFolder = 'report';
@@ -148,7 +147,7 @@ Reporter.prototype = {
     this.events.on('report:test:finished', this.testFinished.bind(this));
     this.events.on('report:runner:finished', this.runnerFinished.bind(this));
     this.events.on('report:testsuite:started', this.testsuiteStarted.bind(this));
-    this.events.on('report:testsuite:finished', this.testsuiteFinished.bind(this));
+//    this.events.on('report:testsuite:finished', this.testsuiteFinished.bind(this));
     return this;
   },
 
@@ -174,16 +173,15 @@ Reporter.prototype = {
    */
 
   testsuiteStarted: function (name) {
-    this.testCount = 0;
+console.log('testsuiteStarted...');
+    
+			    this.testCount = 0;
     this.testIdx++;
     this.xml[0].children.push({
       name: 'testsuite',
       children: [],
       attrs: {
-        start: Math.round(new Date().getTime() / 1000),
         name: name + ' [' + this.browser + ']',
-        end: null,
-        totalTests: 0
       }
     });
     return this;
@@ -197,15 +195,8 @@ Reporter.prototype = {
    */
 
   testsuiteFinished: function () {
-    var timestamp = Math.round(new Date().getTime() / 1000);
-    this.xml[0].children[this.testIdx].children[this.testCount].attrs.end = timestamp;
-    this.xml[0].children[this.testIdx].children[this.testCount].attrs.result = this.lastAssertion.success ? 'Passed' : 'Failed';
-
-    if (this.variationCount > -1) {
-      this.xml[0].children[this.testIdx].children[this.testCount].children[this.variationCount].attrs.end = timestamp;
-    }
-    
-    this.xml[0].children[this.testIdx].attrs.end = timestamp;
+console.log('testsuiteFinished...');
+ //   this.xml[0].children[this.testIdx].attrs.end = Math.round(new Date().getTime() / 1000);
     return this;
   },
 
@@ -218,29 +209,27 @@ Reporter.prototype = {
    */
 
   assertion: function (data) {
-    var timestamp = Math.round(new Date().getTime() / 1000);
+console.log('assertion...');
+if (! data.success) {
+var timestamp = Math.round(new Date().getTime() / 1000);
     this.xml[0].children[this.testIdx].children[this.testCount].children.push({
-      name: 'variation',
+      name: 'failure',
       attrs: {
-        start: timestamp,
         name: data.type,
-        end: null
-      },
-      children: [
-        {name: 'severity', text: (data.success ? 'pass' : 'fail') },
-        {name: 'description', text: jsonxml.cdata((data.message ? data.message : 'Expected: ' + data.expected + 'Actual: ' + data.value)) },
-        {name: 'resource', text: 'DalekJSTest'}
-      ]
+	message:  (data.message ? data.message : 'Expected: ' + data.expected + 'Actual: ' + data.value)
+      }
     });
+// jsonxml.cdata(
 
     if (this.variationCount > -1 && this.xml[0].children[this.testIdx].children[this.testCount].children[this.variationCount]) {
-      this.xml[0].children[this.testIdx].children[this.testCount].children[this.variationCount].attrs.end = timestamp;
+      //this.xml[0].children[this.testIdx].children[this.testCount].children[this.variationCount].attrs.end = timestamp;
     }
 
-    this.lastAssertion = data;
     this.variationCount++;
     return this;
-  },
+}
+
+},
 
   /**
    * Generates XML skeleton for a testcase
@@ -251,15 +240,14 @@ Reporter.prototype = {
    */
 
   testStarted: function (data) {
+console.log('testStarted...');
     this.variationCount = -1;
     this.xml[0].children[this.testIdx].children.push({
       name: 'testcase',
       children: [],
       attrs: {
-        start: Math.round(new Date().getTime() / 1000),
-        name: data.name,
-        end: null,
-        result: null
+	      classname: this.xml[0].children[this.testIdx].attrs.name,
+	      name: data.name
       }
     });
 
@@ -275,17 +263,23 @@ Reporter.prototype = {
    */
 
   testFinished: function (data) {
+console.log('testFinished... this.testIdx='+this.testIdx+', this.testCount='+this.testCount);
     var timestamp = Math.round(new Date().getTime() / 1000);
-    this.xml[0].children[this.testIdx].children[this.testCount].attrs.end = timestamp;
-    this.xml[0].children[this.testIdx].children[this.testCount].attrs.result = data.status ? 'Passed' : 'Failed';
+if (typeof this.xml[0].children[this.testIdx].children[this.testCount].attrs === 'undefined') {
+  this.xml[0].children[this.testIdx].children[this.testCount].attrs = {};
+}
+//    this.xml[0].children[this.testIdx].children[this.testCount].attrs.end = timestamp;
+//    this.xml[0].children[this.testIdx].children[this.testCount].attrs.result = data.status ? 'Passed' : 'Failed';
 
     if (this.variationCount > -1) {
-      this.xml[0].children[this.testIdx].children[this.testCount].children[this.variationCount].attrs.end = timestamp;
+      if (typeof this.xml[0].children[this.testIdx].children[this.testCount].children[this.variationCount].attrs === 'undefined') {
+      this.xml[0].children[this.testIdx].children[this.testCount].children[this.variationCount].attrs = {};
+      }
+       // this.xml[0].children[this.testIdx].children[this.testCount].children[this.variationCount].attrs.end = timestamp;
     }
 
     this.testCount++;
     this.variationCount = -1;
-    this.xml[0].children[this.testIdx].attrs.totalTests = this.testCount;
     return this;
   },
 
@@ -298,6 +292,7 @@ Reporter.prototype = {
    */
 
   runnerFinished: function (data) {
+console.log('runnerFinished...');
     this.data.elapsedTime = data.elapsedTime;
     this.data.status = data.status;
     this.data.assertions = data.assertions;
@@ -319,7 +314,7 @@ Reporter.prototype = {
    * Helper method to generate deeper nested directory structures
    *
    * @method _recursiveMakeDirSync
-   * @param {string} path Path to create
+   * @param {string} path PAth to create
    */
 
   _recursiveMakeDirSync: function (path) {
